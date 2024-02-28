@@ -24,5 +24,10 @@ namespace BreachQR
         {
             InitializeComponent();
         }
+
+        private void button_close_Click(object sender, RoutedEventArgs e)
+        {
+            Environment.Exit(0);
+        }
     }
 }
