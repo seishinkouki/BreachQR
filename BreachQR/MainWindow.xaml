@@ -21,7 +21,7 @@
         <local:MainViewModel />
     </Window.DataContext>
     <Window.Resources>
-        <DrawingImage x:Key="ic_close">
+        <DrawingImage x:Key="svg_qr">
             <DrawingImage.Drawing>
                 <DrawingGroup>
                     <GeometryDrawing Brush="Black"
@@ -45,6 +45,8 @@
                 Height="28"
                 HorizontalAlignment="Left"
                 Orientation="Horizontal">
+                <Button Content="启动" Command="{Binding PulseOrResumeCommand}"/>
+                <Button Content="循环" Command="{Binding ToggleLoopingCommand}"/>
                 <TextBlock VerticalAlignment="Center" Text="当前文件: " />
                 <TextBlock
                     Margin="0,0,10,0"
@@ -92,18 +94,6 @@
         </Grid>
         <Image Grid.Row="1" 
                 Margin="6"
-               Source="{StaticResource ic_close}" />
-
-        <!--<DrawingImage>
-                <DrawingImage.Drawing>
-                    <DrawingGroup ClipGeometry="M0,0 V24 H24 V0 H0 Z">
-                        <GeometryDrawing Brush="Red"
-                          Geometry="F0 M24,24z M0,0z M5.21723,16.4509C4.64003,17.0905 4.68203,17.8189 5.21723,18.3421 5.75123,18.8653 6.65362,18.8329 7.15522,18.3421 7.52928,17.977 10.3498,15.0233 11.7599,13.5448 13.1706,15.0243 15.9893,17.977 16.3633,18.3402 16.8649,18.8298 17.7673,18.8634 18.3013,18.3402 18.8365,17.8206 18.8785,17.091 18.3013,16.4514L13.8049,11.7618 18.3013,7.07225C18.8785,6.43265 18.8365,5.70425 18.3013,5.18105 17.7673,4.65785 16.8649,4.69025 16.3633,5.18105 15.9892,5.54616 13.1687,8.49985 11.7585,9.97833 10.3479,8.4988 7.52916,5.54607 7.15523,5.18287 6.65363,4.69327 5.75123,4.65967 5.21723,5.18287 4.68203,5.70247 4.64003,6.43207 5.21723,7.07167L9.71363,11.7613 5.21723,16.4509z" />
-                    </DrawingGroup>
-                </DrawingImage.Drawing>
-            </DrawingImage>-->
-        
-
-        <!--<Image Grid.Row="1" Source="{Binding ImageSource}"/>-->
+               Source="{StaticResource svg_qr}" />
     </Grid>
 </Window>

@@ -1,5 +1,4 @@
 ﻿using HandyControl.Controls;
-using QRCoder;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -7,24 +6,23 @@ using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Windows.Interop;
-using System.Windows;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using Net.Codecrete.QrCodeGenerator;
-using System.Drawing.Imaging;
 using System.Xml.Serialization;
+using CommunityToolkit.Mvvm.Input;
 
 namespace BreachQR
 {
     public partial class MainViewModel : INotifyPropertyChanged
     {
-        private static TaskFactory? uiFactory;
+        //private static TaskFactory? uiFactory;
         private static int ChunkSize = 2000;
+        XmlSerializer serializer = new XmlSerializer(typeof(svg));
+        private CancellationTokenSource cts;
+        private bool PulseFlag = false;
+        private bool ShouldLoop = true;
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void NotifyPropertyChanged(String info)
@@ -41,7 +39,6 @@ namespace BreachQR
             }
             get { return fileName; }
         }
-
         private long fileBytes;
         public long FileBytes
         {
@@ -68,16 +65,6 @@ namespace BreachQR
             }
             get { return currentChunk; }
         }
-        private ImageSource imageSource;
-        public ImageSource ImageSource
-        {
-            set
-            {
-                imageSource = value;
-                NotifyPropertyChanged("imageSource");
-            }
-            get { return imageSource; }
-        }
         private string svgStr;
         public string SvgStr
         {
@@ -89,13 +76,9 @@ namespace BreachQR
             get { return svgStr; }
 
         }
-        private static Task task;
+
         public MainViewModel() 
         {
-            var tokenSource = new CancellationTokenSource();
-            CancellationToken ct = tokenSource.Token;
-
-
             List<string> arguments = Environment.GetCommandLineArgs().ToList();
             arguments.Add(Path.Combine(AppContext.BaseDirectory, "HandyControl.dll"));
             Console.WriteLine("GetCommandLineArgs: {0}", string.Join(", ", arguments));
@@ -110,119 +93,67 @@ namespace BreachQR
             }
             else
             {
-                //tokenSource.Cancel();
                 FileInfo fileInfo = new FileInfo(arguments[0]);
                 FileName = fileInfo.Name;
             }
 
-            uiFactory = new TaskFactory(TaskScheduler.FromCurrentSynchronizationContext());
+            //uiFactory = new TaskFactory(TaskScheduler.FromCurrentSynchronizationContext());
 
-            task = Task.Run(() =>
-            {
-                ct.ThrowIfCancellationRequested();
-
-                while (true)
-                {
-                    if (ct.IsCancellationRequested)
-                    {
-                        ct.ThrowIfCancellationRequested();
-                    }
-                    int i = 0;
-                    CurrentChunk = i;
-                    //int bytesRead;
-                    var buffer = new byte[ChunkSize];
-                    var base64string = "";
-
-                    //QRCodeGenerator qrGenerator = new QRCodeGenerator();
-                    //using (var file = File.OpenRead(arguments[1]))
-                    //{
-                    //    while ((bytesRead = file.Read(buffer, 0, buffer.Length)) > 0)
-                    //    { 
-                    //        base64string = Convert.ToBase64String(buffer);
-                    //        QRCodeData qrCodeData = qrGenerator.CreateQrCode(base64string, QRCodeGenerator.ECCLevel.Q);
-                    //        QRCode qrCode = new QRCode(qrCodeData);
-                    //        Bitmap qrCodeImage = qrCode.GetGraphic(20);
-
-                    //        uiFactory!.StartNew(() =>
-                    //        {
-                    //            CurrentChunk = i;
-                    //            ImageSource = ImageSourceFromBitmap(qrCodeImage);
-                    //        });
-                    //        i++;
-                    //        //Thread.Sleep(100);
-                    //    }
-                    //}
-
-                    var bytesRead = 0;
-
-                    using (var stream = File.OpenRead(arguments[1]))
-                    {
-                        do
-                        {
-                            //buffer = new byte[bufferSize];
-                            bytesRead = stream.Read(buffer, 0, ChunkSize);
-                            base64string = Convert.ToBase64String(buffer);
-                            //QRCodeData qrCodeData = qrGenerator.CreateQrCode(base64string, QRCodeGenerator.ECCLevel.Q);
-                            //QRCode qrCode = new QRCode(qrCodeData);
-                            //qrCodeData.Dispose();
-                            //Bitmap qrCodeImage = qrCode.GetGraphic(20);
-
-                            var qr = QrCode.EncodeText(base64string, QrCode.Ecc.Low);
-                            
-
-
-                            //uiFactory!.StartNew(() =>
-                            //{
-                                CurrentChunk = i;
-                            var abc = qr.ToSvgString(1);
-
-                            XmlSerializer serializer = new XmlSerializer(typeof(svg));
-                            using (TextReader reader = new StringReader(abc))
-                            {
-                                svg result = (svg)serializer.Deserialize(reader);
-                                SvgStr = result.path.d;
-                            }
-
-                            //ImageSource = QrCodeDrawing.CreateDrawing(qr, 200, 0);
-                            //ImageSource = ImageSourceFromBitmap(qrCodeImage);
-                            //qrCodeImage.Dispose();
-                            //});
-                            //qrCodeData.Dispose();
-                            //qrCode.Dispose();
-                            i++;
-                            // Process buffer
-
-                        } while (bytesRead > 0);
-                    }
-                }
-            }, tokenSource.Token);
-
-            //try
-            //{
-            //    Task.WaitAll(task);
-            //    //await task;
-            //}
-            //catch (OperationCanceledException e)
-            //{
-            //    Console.WriteLine($"{nameof(OperationCanceledException)} thrown with message: {e.Message}");
-            //}
-            //finally
-            //{
-            //    tokenSource.Dispose();
-            //}
+            StartTask(arguments[1]).ConfigureAwait(false);
         }
-        [DllImport("gdi32.dll", EntryPoint = "DeleteObject")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        public static extern bool DeleteObject([In] IntPtr hObject);
-
-        public ImageSource ImageSourceFromBitmap(Bitmap bmp)
+        [RelayCommand]
+        public void PulseOrResume()
         {
-            var handle = bmp.GetHbitmap();
-            try
+            PulseFlag = !PulseFlag;
+        }
+        [RelayCommand]
+        public void ToggleLooping()
+        {
+            ShouldLoop = !ShouldLoop;
+        }
+        public async Task StartTask(string filePath)
+        {
+            cts = new CancellationTokenSource();
+            var token = cts.Token;
+            await Task.Run(() =>
             {
-                return Imaging.CreateBitmapSourceFromHBitmap(handle, IntPtr.Zero, Int32Rect.Empty, BitmapSizeOptions.FromEmptyOptions());
-            }
-            finally { DeleteObject(handle); }
+                while (!token.IsCancellationRequested)
+                {
+                    if(!ShouldLoop)
+                    {
+                        continue;
+                    }
+                    using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+                    byte[] buffer = new byte[ChunkSize];
+                    int bytesRead;
+                    int i = 0;
+
+                    while ((bytesRead = fs.Read(buffer, 0, buffer.Length)) > 0)
+                    {
+
+                        // 处理读取到的数据
+                        var qr_svg = QrCode.EncodeText(Convert.ToBase64String(buffer), QrCode.Ecc.Low).ToSvgString(1);
+                        CurrentChunk = i;
+                        using (TextReader reader = new StringReader(qr_svg))
+                        {
+                            svg result = (svg)serializer.Deserialize(reader);
+                            SvgStr = result.path.d;
+                            i++;
+                        }
+                        // 检查是否需要取消任务
+                        if (token.IsCancellationRequested)
+                        {
+                            break;
+                        }
+
+                        // 检查是否需要暂停任务
+                        while (PulseFlag)
+                        {
+                            Thread.Sleep(1);
+                        }
+                    }
+                }     
+            }, token);
         }
     }
 }
