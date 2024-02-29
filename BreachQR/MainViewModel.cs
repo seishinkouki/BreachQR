@@ -15,12 +15,16 @@ using System.Windows.Interop;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using Net.Codecrete.QrCodeGenerator;
+using System.Drawing.Imaging;
+using System.Xml.Serialization;
 
 namespace BreachQR
 {
     public partial class MainViewModel : INotifyPropertyChanged
     {
         private static TaskFactory? uiFactory;
+        private static int ChunkSize = 1500;
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void NotifyPropertyChanged(String info)
@@ -74,6 +78,17 @@ namespace BreachQR
             }
             get { return imageSource; }
         }
+        private string svgStr;
+        public string SvgStr
+        {
+            set
+            {
+                svgStr = value;
+                NotifyPropertyChanged("svgStr");
+            }
+            get { return svgStr; }
+
+        }
         private static Task task;
         public MainViewModel() 
         {
@@ -91,7 +106,7 @@ namespace BreachQR
                 FileBytes = fileInfo.Length;
                 FileName = fileInfo.Name;
 
-                TotalChunks = FileBytes % 1024 == 0 ? FileBytes / 1024 : FileBytes / 1024 + 1;
+                TotalChunks = FileBytes % ChunkSize == 0 ? FileBytes / ChunkSize : FileBytes / ChunkSize + 1;
             }
             else
             {
@@ -114,12 +129,11 @@ namespace BreachQR
                     }
                     int i = 0;
                     CurrentChunk = i;
-                    const int chunkSize = 1024;
                     //int bytesRead;
-                    var buffer = new byte[chunkSize];
+                    var buffer = new byte[ChunkSize];
                     var base64string = "";
 
-                    QRCodeGenerator qrGenerator = new QRCodeGenerator();
+                    //QRCodeGenerator qrGenerator = new QRCodeGenerator();
                     //using (var file = File.OpenRead(arguments[1]))
                     //{
                     //    while ((bytesRead = file.Read(buffer, 0, buffer.Length)) > 0)
@@ -146,21 +160,35 @@ namespace BreachQR
                         do
                         {
                             //buffer = new byte[bufferSize];
-                            bytesRead = stream.Read(buffer, 0, chunkSize);
+                            bytesRead = stream.Read(buffer, 0, ChunkSize);
                             base64string = Convert.ToBase64String(buffer);
-                            QRCodeData qrCodeData = qrGenerator.CreateQrCode(base64string, QRCodeGenerator.ECCLevel.Q);
-                            QRCode qrCode = new QRCode(qrCodeData);
+                            //QRCodeData qrCodeData = qrGenerator.CreateQrCode(base64string, QRCodeGenerator.ECCLevel.Q);
+                            //QRCode qrCode = new QRCode(qrCodeData);
                             //qrCodeData.Dispose();
-                            Bitmap qrCodeImage = qrCode.GetGraphic(20);
+                            //Bitmap qrCodeImage = qrCode.GetGraphic(20);
+
+                            var qr = QrCode.EncodeText(base64string, QrCode.Ecc.Medium);
                             
-                            uiFactory!.StartNew(() =>
-                            {
+
+
+                            //uiFactory!.StartNew(() =>
+                            //{
                                 CurrentChunk = i;
-                                ImageSource = ImageSourceFromBitmap(qrCodeImage);
-                                qrCodeImage.Dispose();
-                            });
-                            qrCodeData.Dispose();
-                            qrCode.Dispose();
+                            var abc = qr.ToSvgString(1);
+
+                            XmlSerializer serializer = new XmlSerializer(typeof(svg));
+                            using (TextReader reader = new StringReader(abc))
+                            {
+                                svg result = (svg)serializer.Deserialize(reader);
+                                SvgStr = result.path.d;
+                            }
+
+                            //ImageSource = QrCodeDrawing.CreateDrawing(qr, 200, 0);
+                            //ImageSource = ImageSourceFromBitmap(qrCodeImage);
+                            //qrCodeImage.Dispose();
+                            //});
+                            //qrCodeData.Dispose();
+                            //qrCode.Dispose();
                             i++;
                             // Process buffer
 
