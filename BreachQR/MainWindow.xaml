@@ -91,7 +91,7 @@
             </Button>
         </Grid>
         <Image Grid.Row="1" 
- 
+                Margin="6"
                Source="{StaticResource ic_close}" />
 
         <!--<DrawingImage>

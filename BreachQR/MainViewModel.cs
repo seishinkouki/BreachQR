@@ -24,7 +24,7 @@ namespace BreachQR
     public partial class MainViewModel : INotifyPropertyChanged
     {
         private static TaskFactory? uiFactory;
-        private static int ChunkSize = 1500;
+        private static int ChunkSize = 2000;
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void NotifyPropertyChanged(String info)
@@ -167,7 +167,7 @@ namespace BreachQR
                             //qrCodeData.Dispose();
                             //Bitmap qrCodeImage = qrCode.GetGraphic(20);
 
-                            var qr = QrCode.EncodeText(base64string, QrCode.Ecc.Medium);
+                            var qr = QrCode.EncodeText(base64string, QrCode.Ecc.Low);
                             
 
 
