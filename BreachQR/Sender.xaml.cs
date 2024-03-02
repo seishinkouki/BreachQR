@@ -16,18 +16,17 @@ using System.Windows.Shapes;
 namespace BreachQR
 {
     /// <summary>
-    /// MainWindow.xaml 的交互逻辑
+    /// Sender.xaml 的交互逻辑
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class Sender : Page
     {
-        public MainWindow()
+        public Sender()
         {
             InitializeComponent();
         }
-        protected override void OnMouseLeftButtonDown(MouseButtonEventArgs e)
+        private void button_close_Click(object sender, RoutedEventArgs e)
         {
-            base.OnMouseLeftButtonDown(e);
-            this.DragMove();
+            Environment.Exit(0);
         }
     }
 }

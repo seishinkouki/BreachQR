@@ -62,8 +62,22 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Receiver.xaml.cs">
+      <DependentUpon>Receiver.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="Sender.xaml.cs">
+      <DependentUpon>Sender.xaml</DependentUpon>
+    </Compile>
     <Compile Include="QrCodeDrawing.cs" />
     <Compile Include="SVGXml.cs" />
+    <Page Include="Receiver.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Sender.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

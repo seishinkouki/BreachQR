@@ -17,12 +17,20 @@ namespace BreachQR
 {
     public partial class MainViewModel : INotifyPropertyChanged
     {
+        private int bootPage;
+        public int BootPage
+        {
+            set
+            {
+                bootPage = value;
+                NotifyPropertyChanged("bootPage");
+            }
+            get { return bootPage; }
+        }
         //private static TaskFactory? uiFactory;
         private static int ChunkSize = 2000;
         XmlSerializer serializer = new XmlSerializer(typeof(svg));
         private CancellationTokenSource cts;
-        //private bool PulseFlag = false;
-        //private bool ShouldLoop = true;
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void NotifyPropertyChanged(String info)
@@ -105,10 +113,11 @@ namespace BreachQR
             ShouldLoop = true;
 
             List<string> arguments = Environment.GetCommandLineArgs().ToList();
-            arguments.Add(Path.Combine(AppContext.BaseDirectory, "HandyControl.dll"));
+            //arguments.Add(Path.Combine(AppContext.BaseDirectory, "HandyControl.dll"));
             Console.WriteLine("GetCommandLineArgs: {0}", string.Join(", ", arguments));
             if (arguments.Count > 1)
             {
+                BootPage = 0;
                 FileInfo fileInfo = new FileInfo(arguments[1]);
 
                 FileBytes = fileInfo.Length;
@@ -116,16 +125,16 @@ namespace BreachQR
 
                 CurrentChunk = 0;
                 TotalChunks = FileBytes % ChunkSize == 0 ? FileBytes / ChunkSize : FileBytes / ChunkSize + 1;
+                StartTask(arguments[1]).ConfigureAwait(false);
             }
             else
             {
+                BootPage = 1;
                 FileInfo fileInfo = new FileInfo(arguments[0]);
                 FileName = fileInfo.Name;
             }
 
-            //uiFactory = new TaskFactory(TaskScheduler.FromCurrentSynchronizationContext());
-
-            StartTask(arguments[1]).ConfigureAwait(false);
+            //uiFactory = new TaskFactory(TaskScheduler.FromCurrentSynchronizationContext()); 
         }
         public async Task StartTask(string filePath)
         {
@@ -149,7 +158,7 @@ namespace BreachQR
                     {
 
                         // 处理读取到的数据
-                        var qr_svg = QrCode.EncodeText(Convert.ToBase64String(buffer), QrCode.Ecc.Low).ToSvgString(1);
+                        var qr_svg = QrCode.EncodeText(string.Concat(i, "|", TotalChunks, "|", Convert.ToBase64String(buffer)), QrCode.Ecc.Low).ToSvgString(1);
                         CurrentChunk = i;
                         using (TextReader reader = new StringReader(qr_svg))
                         {
