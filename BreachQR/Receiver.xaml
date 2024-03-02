@@ -43,7 +43,7 @@
             <Border
                 Grid.Row="4"
                 Grid.Column="0"
-                Background="White" />
+                Background="Black" />
             <Border
                 Grid.Row="4"
                 Grid.Column="4"

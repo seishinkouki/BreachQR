@@ -29,5 +29,11 @@ namespace BreachQR
             base.OnMouseLeftButtonDown(e);
             this.DragMove();
         }
+
+        private void mwin_Deactivated(object sender, EventArgs e)
+        {
+            var window = (Window)sender;
+            window.Topmost = true;
+        }
     }
 }
