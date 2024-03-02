@@ -5,10 +5,11 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:hc="https://handyorg.github.io/handycontrol"
     xmlns:local="clr-namespace:BreachQR"
+    xmlns:math="http://hexinnovation.com/math"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     Title="MainWindow"
-    Width="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height, ConverterParameter=x-28, Converter={StaticResource Math}}"
-    Height="{Binding Source={x:Static SystemParameters.WorkArea}, Path=Height}"
+    Width="400"
+    Height="400"
     d:Height="400"
     d:Width="400"
     AllowsTransparency="True"
@@ -24,8 +25,7 @@
         <DrawingImage x:Key="svg_qr">
             <DrawingImage.Drawing>
                 <DrawingGroup>
-                    <GeometryDrawing Brush="Black"
-                          Geometry="{Binding SvgStr}" />
+                    <GeometryDrawing Brush="Black" Geometry="{Binding SvgStr}" />
                 </DrawingGroup>
             </DrawingImage.Drawing>
         </DrawingImage>
@@ -36,36 +36,77 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Grid Grid.Row="0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="3*" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
             <StackPanel
-                Grid.Row="0"
                 Height="28"
                 HorizontalAlignment="Left"
                 Orientation="Horizontal">
-                <Button Content="启动" Command="{Binding PulseOrResumeCommand}"/>
-                <Button Content="循环" Command="{Binding ToggleLoopingCommand}"/>
-                <TextBlock VerticalAlignment="Center" Text="当前文件: " />
+                <ToggleButton
+                    Height="22"
+                    Margin="2,0,5,0"
+                    Padding="5,0,5,0"
+                    IsChecked="{Binding PulseFlag}">
+                    <ToggleButton.Style>
+                        <Style BasedOn="{StaticResource ToggleButtonDefault}" TargetType="ToggleButton">
+                            <Style.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter Property="Content" Value="继续" />
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="False">
+                                    <Setter Property="Content" Value="暂停" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ToggleButton.Style>
+                </ToggleButton>
+                <ToggleButton
+                    Height="22"
+                    Margin="0,0,5,0"
+                    Padding="5,0,5,0"
+                    IsChecked="{Binding ShouldLoop}">
+                    <ToggleButton.Style>
+                        <Style BasedOn="{StaticResource ToggleButtonDefault}" TargetType="ToggleButton">
+                            <Style.Triggers>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter Property="Content" Value="单次" />
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="False">
+                                    <Setter Property="Content" Value="循环" />
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ToggleButton.Style>
+                </ToggleButton>
+                <TextBlock
+                    VerticalAlignment="Center"
+                    Text="文件: "
+                    Visibility="Collapsed" />
                 <TextBlock
                     Margin="0,0,10,0"
                     VerticalAlignment="Center"
                     Text="{Binding FileName}" />
-                <TextBlock VerticalAlignment="Center" Text="当前切片: " />
-                <TextBlock VerticalAlignment="Center" Text="{Binding CurrentChunk}"/>
-                <TextBlock VerticalAlignment="Center" Text="/"/>
-                <TextBlock VerticalAlignment="Center" Text="{Binding TotalChunks}"/>
+                <TextBlock VerticalAlignment="Center" Text="进度: " />
+                <hc:CircleProgressBar
+                    Width="24"
+                    Height="24"
+                    ShowText="False"
+                    Value="{math:Convert '100*x/y',
+                                         x={Binding CurrentChunk},
+                                         y={Binding TotalChunks}}" />
                 <TextBlock
-                    Margin="50,0,0,0"
+                    Margin="5,0,0,0"
                     VerticalAlignment="Center"
-                    Text="文件大小: " />
-                <TextBlock VerticalAlignment="Center" Text="{Binding FileBytes}" />
-                <TextBlock VerticalAlignment="Center" Text="Bytes" />
+                    Text="{Binding CurrentChunk}" />
+                <TextBlock VerticalAlignment="Center" Text="/" />
+                <TextBlock VerticalAlignment="Center" Text="{Binding TotalChunks}" />
+                <TextBlock
+                    Margin="10,0,0,0"
+                    VerticalAlignment="Center"
+                    Text="大小: " />
+                <TextBlock VerticalAlignment="Center" Text="{math:Convert 'x/1024', x={Binding FileBytes}}" />
+                <TextBlock VerticalAlignment="Center" Text="KB" />
             </StackPanel>
             <Button
                 x:Name="button_close"
-                Grid.Column="1"
                 Width="28"
                 Height="28"
                 Padding="2"
@@ -83,17 +124,28 @@
                                 <Setter Property="Fill" Value="Transparent" />
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding ElementName=button_close, Path=IsMouseOver}" Value="true">
-                                        <Setter Property="Fill" Value="Red" />
+                                        <Setter Property="Fill" Value="White" />
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
                         </Path.Style>
                     </Path>
                 </Button.Content>
+                <Button.Style>
+                    <Style BasedOn="{StaticResource ButtonDefault}" TargetType="Button">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Style.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Background" Value="Red" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Button.Style>
             </Button>
         </Grid>
-        <Image Grid.Row="1" 
-                Margin="6"
-               Source="{StaticResource svg_qr}" />
+        <Image
+            Grid.Row="1"
+            Margin="6"
+            Source="{StaticResource svg_qr}" />
     </Grid>
 </Window>

@@ -21,8 +21,8 @@ namespace BreachQR
         private static int ChunkSize = 2000;
         XmlSerializer serializer = new XmlSerializer(typeof(svg));
         private CancellationTokenSource cts;
-        private bool PulseFlag = false;
-        private bool ShouldLoop = true;
+        //private bool PulseFlag = false;
+        //private bool ShouldLoop = true;
 
         public event PropertyChangedEventHandler PropertyChanged;
         protected void NotifyPropertyChanged(String info)
@@ -32,7 +32,7 @@ namespace BreachQR
         private string fileName;
         public string FileName
         {
-            set 
+            set
             {
                 fileName = value;
                 NotifyPropertyChanged("FileName");
@@ -77,18 +77,44 @@ namespace BreachQR
 
         }
 
-        public MainViewModel() 
+        private bool pulseFlag;
+        public bool PulseFlag
         {
+            set
+            {
+                pulseFlag = value;
+                NotifyPropertyChanged("pulseFlag");
+            }
+            get { return pulseFlag; }
+        }
+
+        private bool shouldLoop;
+        public bool ShouldLoop
+        {
+            set
+            {
+                shouldLoop = value;
+                NotifyPropertyChanged("shouldLoop");
+            }
+            get { return shouldLoop; }
+        }
+
+        public MainViewModel()
+        {
+            PulseFlag = false;
+            ShouldLoop = true;
+
             List<string> arguments = Environment.GetCommandLineArgs().ToList();
             arguments.Add(Path.Combine(AppContext.BaseDirectory, "HandyControl.dll"));
             Console.WriteLine("GetCommandLineArgs: {0}", string.Join(", ", arguments));
-            if (arguments.Count > 1 )
+            if (arguments.Count > 1)
             {
                 FileInfo fileInfo = new FileInfo(arguments[1]);
 
                 FileBytes = fileInfo.Length;
                 FileName = fileInfo.Name;
 
+                CurrentChunk = 0;
                 TotalChunks = FileBytes % ChunkSize == 0 ? FileBytes / ChunkSize : FileBytes / ChunkSize + 1;
             }
             else
@@ -101,32 +127,23 @@ namespace BreachQR
 
             StartTask(arguments[1]).ConfigureAwait(false);
         }
-        [RelayCommand]
-        public void PulseOrResume()
-        {
-            PulseFlag = !PulseFlag;
-        }
-        [RelayCommand]
-        public void ToggleLooping()
-        {
-            ShouldLoop = !ShouldLoop;
-        }
         public async Task StartTask(string filePath)
         {
             cts = new CancellationTokenSource();
             var token = cts.Token;
             await Task.Run(() =>
             {
+                Thread.Sleep(500);
                 while (!token.IsCancellationRequested)
                 {
-                    if(!ShouldLoop)
+                    if (!ShouldLoop)
                     {
                         continue;
                     }
                     using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
                     byte[] buffer = new byte[ChunkSize];
                     int bytesRead;
-                    int i = 0;
+                    int i = 1;
 
                     while ((bytesRead = fs.Read(buffer, 0, buffer.Length)) > 0)
                     {
@@ -152,7 +169,7 @@ namespace BreachQR
                             Thread.Sleep(1);
                         }
                     }
-                }     
+                }
             }, token);
         }
     }
