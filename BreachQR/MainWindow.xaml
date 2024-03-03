@@ -15,11 +15,13 @@
     d:Width="400"
     AllowsTransparency="True"
     Background="Transparent"
+    Deactivated="mwin_Deactivated"
+    Left="{Binding CurX, Mode=OneWayToSource}"
     ResizeMode="CanResizeWithGrip"
+    Top="{Binding CurY, Mode=OneWayToSource}"
     WindowStartupLocation="CenterScreen"
     WindowStyle="None"
-    mc:Ignorable="d"
-    Deactivated="mwin_Deactivated">
+    mc:Ignorable="d">
     <Window.DataContext>
         <local:MainViewModel />
     </Window.DataContext>

@@ -8,13 +8,15 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     x:Name="receiver"
     Title="Receiver"
-    d:DesignHeight="428"
+    d:DesignHeight="431"
     d:DesignWidth="400"
     mc:Ignorable="d">
-
+    <Page.DataContext>
+        <local:MainViewModel />
+    </Page.DataContext>
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="{Binding ActualWidth, ElementName=mwin}" />
+            <RowDefinition Height="*" />
             <RowDefinition Height="31" />
         </Grid.RowDefinitions>
         <Grid Grid.Row="0" Background="Transparent">
@@ -131,6 +133,13 @@
                             </Style>
                         </Button.Style>
                     </Button>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <TextBox
+                            HorizontalAlignment="Left"
+                            VerticalAlignment="Center"
+                            Text="{Binding CurXX, Mode=TwoWay}" />
+                    </StackPanel>
+
                 </Grid>
             </Grid>
         </Border>

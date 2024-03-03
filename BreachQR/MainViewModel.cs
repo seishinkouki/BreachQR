@@ -12,105 +12,55 @@ using System.Threading.Tasks;
 using Net.Codecrete.QrCodeGenerator;
 using System.Xml.Serialization;
 using CommunityToolkit.Mvvm.Input;
+using System.Runtime.CompilerServices;
+using System.Diagnostics;
 
 namespace BreachQR
 {
     public partial class MainViewModel : INotifyPropertyChanged
     {
-        private int bootPage;
-        public int BootPage
+        private double curX;
+        public double CurX
         {
-            set
-            {
-                bootPage = value;
-                NotifyPropertyChanged("bootPage");
-            }
-            get { return bootPage; }
+            set { curX = value; OnPropertyChanged(); }
+            get { return curX; }
         }
+        private double curY;
+        public double CurY { set { curY = value; OnPropertyChanged(); } get { return curY; } }
+        private int bootPage;
+        public int BootPage { set { bootPage = value; OnPropertyChanged(); } get { return bootPage; } }
         //private static TaskFactory? uiFactory;
         private static int ChunkSize = 2000;
         XmlSerializer serializer = new XmlSerializer(typeof(svg));
         private CancellationTokenSource cts;
 
         public event PropertyChangedEventHandler PropertyChanged;
-        protected void NotifyPropertyChanged(String info)
+        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(info));
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
         }
         private string fileName;
-        public string FileName
-        {
-            set
-            {
-                fileName = value;
-                NotifyPropertyChanged("FileName");
-            }
-            get { return fileName; }
-        }
+        public string FileName { set { fileName = value; OnPropertyChanged(); } get { return fileName; } }
         private long fileBytes;
-        public long FileBytes
-        {
-            set { fileBytes = value; }
-            get { return fileBytes; }
-        }
+        public long FileBytes { set { fileBytes = value; OnPropertyChanged(); } get { return fileBytes; } }
         private long totalChunks;
-        public long TotalChunks
-        {
-            set
-            {
-                totalChunks = value;
-                NotifyPropertyChanged("totalChunks");
-            }
-            get { return totalChunks; }
-        }
+        public long TotalChunks { set { totalChunks = value; OnPropertyChanged(); } get { return totalChunks; } }
         private long currentChunk;
-        public long CurrentChunk
-        {
-            set
-            {
-                currentChunk = value;
-                NotifyPropertyChanged("currentChunk");
-            }
-            get { return currentChunk; }
-        }
+        public long CurrentChunk { set { currentChunk = value; OnPropertyChanged(); } get { return currentChunk; } }
         private string svgStr;
-        public string SvgStr
-        {
-            set
-            {
-                svgStr = value;
-                NotifyPropertyChanged("svgStr");
-            }
-            get { return svgStr; }
-
-        }
+        public string SvgStr { set { svgStr = value; OnPropertyChanged(); } get { return svgStr; } }
 
         private bool pulseFlag;
-        public bool PulseFlag
-        {
-            set
-            {
-                pulseFlag = value;
-                NotifyPropertyChanged("pulseFlag");
-            }
-            get { return pulseFlag; }
-        }
+        public bool PulseFlag { set { pulseFlag = value; OnPropertyChanged(); } get { return pulseFlag; } }
 
         private bool shouldLoop;
-        public bool ShouldLoop
-        {
-            set
-            {
-                shouldLoop = value;
-                NotifyPropertyChanged("shouldLoop");
-            }
-            get { return shouldLoop; }
-        }
+        public bool ShouldLoop { set { shouldLoop = value; OnPropertyChanged(); } get { return shouldLoop; } }
 
         public MainViewModel()
         {
             PulseFlag = false;
             ShouldLoop = true;
+
 
             List<string> arguments = Environment.GetCommandLineArgs().ToList();
             //arguments.Add(Path.Combine(AppContext.BaseDirectory, "HandyControl.dll"));
@@ -125,18 +75,19 @@ namespace BreachQR
 
                 CurrentChunk = 0;
                 TotalChunks = FileBytes % ChunkSize == 0 ? FileBytes / ChunkSize : FileBytes / ChunkSize + 1;
-                StartTask(arguments[1]).ConfigureAwait(false);
+                SendTask(arguments[1]).ConfigureAwait(false);
             }
             else
             {
                 BootPage = 1;
                 FileInfo fileInfo = new FileInfo(arguments[0]);
                 FileName = fileInfo.Name;
+                ReceiveTask().ConfigureAwait(false);
             }
 
             //uiFactory = new TaskFactory(TaskScheduler.FromCurrentSynchronizationContext()); 
         }
-        public async Task StartTask(string filePath)
+        public async Task SendTask(string filePath)
         {
             cts = new CancellationTokenSource();
             var token = cts.Token;
@@ -178,6 +129,23 @@ namespace BreachQR
                             Thread.Sleep(1);
                         }
                     }
+                }
+            }, token);
+        }
+        public async Task ReceiveTask()
+        {
+            cts = new CancellationTokenSource();
+            var token = cts.Token;
+            await Task.Run(() =>
+            {
+                while (!token.IsCancellationRequested)
+                {
+                    if (CurX == 0 | CurY == 0)
+                    {
+                        continue;
+                    }
+                    Trace.WriteLine($"{CurX},{CurY}");
+                    Thread.Sleep(200);
                 }
             }, token);
         }
