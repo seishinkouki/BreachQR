@@ -134,10 +134,9 @@
                         </Button.Style>
                     </Button>
                     <StackPanel Grid.Column="1" Orientation="Horizontal">
-                        <TextBox
-                            HorizontalAlignment="Left"
-                            VerticalAlignment="Center"
-                            Text="{Binding CurXX, Mode=TwoWay}" />
+                        <Button Content="1111111"
+                                Command="{Binding PrintXYCommand}"
+                                />
                     </StackPanel>
 
                 </Grid>

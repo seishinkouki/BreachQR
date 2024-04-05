@@ -11,22 +11,22 @@ using System.Threading;
 using System.Threading.Tasks;
 using Net.Codecrete.QrCodeGenerator;
 using System.Xml.Serialization;
+using CommunityToolkit.Mvvm;
 using CommunityToolkit.Mvvm.Input;
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
+using System.Drawing.Imaging;
+using System.Windows.Media.Imaging;
+using System.Windows.Media;
+using System.Windows;
+using System.Runtime.InteropServices;
+using Size = System.Drawing.Size;
+using System.Windows.Interop;
 
 namespace BreachQR
 {
     public partial class MainViewModel : INotifyPropertyChanged
     {
-        private double curX;
-        public double CurX
-        {
-            set { curX = value; OnPropertyChanged(); }
-            get { return curX; }
-        }
-        private double curY;
-        public double CurY { set { curY = value; OnPropertyChanged(); } get { return curY; } }
         private int bootPage;
         public int BootPage { set { bootPage = value; OnPropertyChanged(); } get { return bootPage; } }
         //private static TaskFactory? uiFactory;
@@ -50,17 +50,16 @@ namespace BreachQR
         private string svgStr;
         public string SvgStr { set { svgStr = value; OnPropertyChanged(); } get { return svgStr; } }
 
-        private bool pulseFlag;
-        public bool PulseFlag { set { pulseFlag = value; OnPropertyChanged(); } get { return pulseFlag; } }
+        private bool pauseFlag;
+        public bool PauseFlag { set { pauseFlag = value; OnPropertyChanged(); } get { return pauseFlag; } }
 
         private bool shouldLoop;
         public bool ShouldLoop { set { shouldLoop = value; OnPropertyChanged(); } get { return shouldLoop; } }
 
         public MainViewModel()
         {
-            PulseFlag = false;
+            PauseFlag = false;
             ShouldLoop = true;
-
 
             List<string> arguments = Environment.GetCommandLineArgs().ToList();
             //arguments.Add(Path.Combine(AppContext.BaseDirectory, "HandyControl.dll"));
@@ -124,7 +123,7 @@ namespace BreachQR
                         }
 
                         // 检查是否需要暂停任务
-                        while (PulseFlag)
+                        while (PauseFlag)
                         {
                             Thread.Sleep(1);
                         }
@@ -138,16 +137,96 @@ namespace BreachQR
             var token = cts.Token;
             await Task.Run(() =>
             {
+                //Thread.Sleep(5000);
                 while (!token.IsCancellationRequested)
                 {
-                    if (CurX == 0 | CurY == 0)
-                    {
-                        continue;
-                    }
-                    Trace.WriteLine($"{CurX},{CurY}");
-                    Thread.Sleep(200);
+          
+
+                    //Rectangle bounds = this.re;
+                    //var qwe = (MainWindow)Application.Current.Windows.OfType<System.Windows.Window>();
+                    //var bounds = qwe.RestoreBounds;
+
+                    //var size_ = new System.Drawing.Size((int)bounds.Width, (int)bounds.Height);
+                    //using (Bitmap bitmap = new Bitmap((int)bounds.Width, (int)bounds.Height))
+                    //{
+                    //    using (Graphics g = Graphics.FromImage(bitmap))
+                    //    {
+                    //        g.CopyFromScreen(new System.Drawing.Point((int)bounds.Left, (int)bounds.Top), System.Drawing.Point.Empty, size_);
+                    //    }
+                    //    bitmap.Save(Path.Combine(AppContext.BaseDirectory, "123.jpg"), ImageFormat.Jpeg);
+                    //}
+                    //cts.Cancel();
+                    //var abc = new Screenshot();
+                    //abc.Start();
+
                 }
             }, token);
         }
+        [RelayCommand]
+        public void PrintXY()
+        {
+            GetWindowRect(new WindowInteropHelper(Application.Current.MainWindow).Handle, out RECT pRect);
+            Trace.WriteLine(pRect.Left + "," + pRect.Top + "," + pRect.Right + "," + pRect.Bottom);
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        public struct RECT
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [DllImport("gdi32.dll")]
+        private static extern int GetDeviceCaps(IntPtr hDc, int nIndex);
+
+        [DllImport("user32.dll")]
+        public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+        private const int DESKTOPVERTRES = 117;
+        private const int DESKTOPHORZRES = 118;
+
+        // 获取真是屏幕宽高
+        public static System.Drawing.Size GetScreenByDevice()
+        {
+            IntPtr hDc = new WindowInteropHelper(Application.Current.MainWindow).Handle;
+            return new System.Drawing.Size()
+            {
+                Width = GetDeviceCaps(hDc, DESKTOPHORZRES),
+                Height = GetDeviceCaps(hDc, DESKTOPVERTRES)
+            };
+        }
+     
+
+        //public static Size GetControlSize()
+        //{
+        //    IntPtr hDc = GetDC(IntPtr.Zero);
+        //    RECT pRect;
+        //    Size cSize = new Size();
+        //    // get coordinates relative to window
+        //    GetWindowRect(hDc, out pRect);
+
+        //    cSize.Width = pRect.Right - pRect.Left;
+        //    cSize.Height = pRect.Bottom - pRect.Top;
+
+        //    return cSize;
+        //}
+        public static Bitmap CaptureScreenSnapshot()
+        {
+            //using (Graphics currentGraphics = Graphics.FromHwnd(IntPtr.Zero))
+            //{
+            //    Console.WriteLine("dpiXRatio={0}", currentGraphics.DpiX / 96);
+            //}
+            System.Drawing.Size sysize = GetScreenByDevice();
+            Bitmap background = new Bitmap(sysize.Width, sysize.Height);
+            using (Graphics gcs = Graphics.FromImage(background))
+            {
+                gcs.CopyFromScreen(0, 0, 0, 0, sysize, CopyPixelOperation.SourceCopy);
+                // Screen.AllScreens[0].Bounds.Size, CopyPixelOperation.SourceCopy);
+            }
+            return background;
+        }
     }
+
 }
