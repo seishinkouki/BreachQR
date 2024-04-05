@@ -166,6 +166,8 @@ namespace BreachQR
         public void PrintXY()
         {
             GetWindowRect(new WindowInteropHelper(Application.Current.MainWindow).Handle, out RECT pRect);
+            var abc = CaptureScreenSnapshot(pRect.Left, pRect.Top, pRect.Right, pRect.Bottom);
+            abc.Save(Path.Combine(AppContext.BaseDirectory, "123.jpg"), ImageFormat.Jpeg);
             Trace.WriteLine(pRect.Left + "," + pRect.Top + "," + pRect.Right + "," + pRect.Bottom);
         }
 
@@ -184,49 +186,40 @@ namespace BreachQR
         [DllImport("user32.dll")]
         public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
-        private const int DESKTOPVERTRES = 117;
-        private const int DESKTOPHORZRES = 118;
+        [DllImport("user32.dll")]
+        private static extern IntPtr GetDC(IntPtr hWnd);
 
-        // 获取真是屏幕宽高
+        /// <summary>
+        /// 获取物理屏幕分辨率
+        /// </summary>
+        /// <returns></returns>
         public static System.Drawing.Size GetScreenByDevice()
         {
-            IntPtr hDc = new WindowInteropHelper(Application.Current.MainWindow).Handle;
+            IntPtr hDc = GetDC(IntPtr.Zero);
+            var DESKTOPVERTRES = 117;
+            var DESKTOPHORZRES = 118;
             return new System.Drawing.Size()
             {
                 Width = GetDeviceCaps(hDc, DESKTOPHORZRES),
                 Height = GetDeviceCaps(hDc, DESKTOPVERTRES)
             };
         }
-     
 
-        //public static Size GetControlSize()
-        //{
-        //    IntPtr hDc = GetDC(IntPtr.Zero);
-        //    RECT pRect;
-        //    Size cSize = new Size();
-        //    // get coordinates relative to window
-        //    GetWindowRect(hDc, out pRect);
-
-        //    cSize.Width = pRect.Right - pRect.Left;
-        //    cSize.Height = pRect.Bottom - pRect.Top;
-
-        //    return cSize;
-        //}
-        public static Bitmap CaptureScreenSnapshot()
+        /// <summary>截取指定区域</summary>
+        /// <param name="x1"></param>
+        /// <param name="y1"></param>
+        /// <param name="x2"></param>
+        /// <param name="y2"></param>
+        /// <returns>返回bitmap</returns>
+        public static Bitmap CaptureScreenSnapshot(int x1, int y1, int x2, int y2)
         {
-            //using (Graphics currentGraphics = Graphics.FromHwnd(IntPtr.Zero))
-            //{
-            //    Console.WriteLine("dpiXRatio={0}", currentGraphics.DpiX / 96);
-            //}
             System.Drawing.Size sysize = GetScreenByDevice();
-            Bitmap background = new Bitmap(sysize.Width, sysize.Height);
+            Bitmap background = new(x2 - x1, y2 - y1);
             using (Graphics gcs = Graphics.FromImage(background))
             {
-                gcs.CopyFromScreen(0, 0, 0, 0, sysize, CopyPixelOperation.SourceCopy);
-                // Screen.AllScreens[0].Bounds.Size, CopyPixelOperation.SourceCopy);
+                gcs.CopyFromScreen(x1, y1, 0, 0, sysize, CopyPixelOperation.SourceCopy);
             }
             return background;
         }
     }
-
 }
