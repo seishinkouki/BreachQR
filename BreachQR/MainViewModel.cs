@@ -22,40 +22,33 @@ using System.Windows;
 using System.Runtime.InteropServices;
 using Size = System.Drawing.Size;
 using System.Windows.Interop;
+using CommunityToolkit.Mvvm.ComponentModel;
+using ZXing;
+using System.Reflection.PortableExecutable;
+using ZXing.Windows.Compatibility;
 
 namespace BreachQR
 {
-    public partial class MainViewModel : INotifyPropertyChanged
+    public partial class MainViewModel : ObservableObject
     {
+        [ObservableProperty]
         private int bootPage;
-        public int BootPage { set { bootPage = value; OnPropertyChanged(); } get { return bootPage; } }
-        //private static TaskFactory? uiFactory;
         private static int ChunkSize = 2000;
         XmlSerializer serializer = new XmlSerializer(typeof(svg));
         private CancellationTokenSource cts;
 
-        public event PropertyChangedEventHandler PropertyChanged;
-        protected virtual void OnPropertyChanged([CallerMemberName] string propertyName = null)
-        {
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
-        }
-        private string fileName;
-        public string FileName { set { fileName = value; OnPropertyChanged(); } get { return fileName; } }
-        private long fileBytes;
-        public long FileBytes { set { fileBytes = value; OnPropertyChanged(); } get { return fileBytes; } }
-        private long totalChunks;
-        public long TotalChunks { set { totalChunks = value; OnPropertyChanged(); } get { return totalChunks; } }
-        private long currentChunk;
-        public long CurrentChunk { set { currentChunk = value; OnPropertyChanged(); } get { return currentChunk; } }
-        private string svgStr;
-        public string SvgStr { set { svgStr = value; OnPropertyChanged(); } get { return svgStr; } }
+        [ObservableProperty] private string fileName;
+        [ObservableProperty] private long fileBytes;
+        [ObservableProperty] private long totalChunks;
+        [ObservableProperty] private long currentChunk;
+        [ObservableProperty] private string svgStr;
+        [ObservableProperty] private bool pauseFlag;
+        [ObservableProperty] private bool shouldLoop;
 
-        private bool pauseFlag;
-        public bool PauseFlag { set { pauseFlag = value; OnPropertyChanged(); } get { return pauseFlag; } }
+        private List<long> QueryedChunks;
 
-        private bool shouldLoop;
-        public bool ShouldLoop { set { shouldLoop = value; OnPropertyChanged(); } get { return shouldLoop; } }
-
+        [ObservableProperty] private long queryedChunkCount;
+        private static BarcodeReader reader;
         public MainViewModel()
         {
             PauseFlag = false;
@@ -79,6 +72,10 @@ namespace BreachQR
             else
             {
                 BootPage = 1;
+                TotalChunks = 0;
+                QueryedChunkCount = 0;
+                QueryedChunks = new List<long>();
+                reader = new BarcodeReader();
                 FileInfo fileInfo = new FileInfo(arguments[0]);
                 FileName = fileInfo.Name;
                 ReceiveTask().ConfigureAwait(false);
@@ -95,6 +92,7 @@ namespace BreachQR
                 Thread.Sleep(500);
                 while (!token.IsCancellationRequested)
                 {
+                    Thread.Sleep(300);
                     if (!ShouldLoop)
                     {
                         continue;
@@ -127,6 +125,7 @@ namespace BreachQR
                         {
                             Thread.Sleep(1);
                         }
+                        Thread.Sleep(300);
                     }
                 }
             }, token);
@@ -137,28 +136,40 @@ namespace BreachQR
             var token = cts.Token;
             await Task.Run(() =>
             {
-                //Thread.Sleep(5000);
+                Thread.Sleep(5000);
                 while (!token.IsCancellationRequested)
                 {
-          
+                    Thread.Sleep(100);
+                    Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        try
+                        {
+                            GetWindowRect(new WindowInteropHelper(Application.Current.MainWindow).Handle, out RECT pRect);
+                            var str = reader.Decode(CaptureScreenSnapshot(pRect.Left, pRect.Top, pRect.Right, pRect.Bottom));
+                            if (str != null)
+                            {
+                                if(TotalChunks == 0)
+                                {
+                                    TotalChunks = Convert.ToInt32(str.Text.Split('|')[1]);
+                                }
+                                var cur = Convert.ToInt32(str.Text.Split('|')[0]);
+                                if (!QueryedChunks.Contains(cur))
+                                {
+                                    QueryedChunks.Add(cur);
+                                    QueryedChunkCount = QueryedChunks.Count;
+                                }
+                                Trace.WriteLine($"{TotalChunks}, {QueryedChunkCount}");
+                                Trace.WriteLine(str.Text);
+                            }
+                        }
+                        catch (Exception ex)
+                        {
 
-                    //Rectangle bounds = this.re;
-                    //var qwe = (MainWindow)Application.Current.Windows.OfType<System.Windows.Window>();
-                    //var bounds = qwe.RestoreBounds;
-
-                    //var size_ = new System.Drawing.Size((int)bounds.Width, (int)bounds.Height);
-                    //using (Bitmap bitmap = new Bitmap((int)bounds.Width, (int)bounds.Height))
-                    //{
-                    //    using (Graphics g = Graphics.FromImage(bitmap))
-                    //    {
-                    //        g.CopyFromScreen(new System.Drawing.Point((int)bounds.Left, (int)bounds.Top), System.Drawing.Point.Empty, size_);
-                    //    }
-                    //    bitmap.Save(Path.Combine(AppContext.BaseDirectory, "123.jpg"), ImageFormat.Jpeg);
-                    //}
-                    //cts.Cancel();
-                    //var abc = new Screenshot();
-                    //abc.Start();
-
+                        }
+                        
+                    });
+                    
+                    
                 }
             }, token);
         }
@@ -167,6 +178,7 @@ namespace BreachQR
         {
             GetWindowRect(new WindowInteropHelper(Application.Current.MainWindow).Handle, out RECT pRect);
             var abc = CaptureScreenSnapshot(pRect.Left, pRect.Top, pRect.Right, pRect.Bottom);
+            //return abc;
             abc.Save(Path.Combine(AppContext.BaseDirectory, "123.jpg"), ImageFormat.Jpeg);
             Trace.WriteLine(pRect.Left + "," + pRect.Top + "," + pRect.Right + "," + pRect.Bottom);
         }

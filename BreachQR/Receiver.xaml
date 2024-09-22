@@ -94,6 +94,8 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="28" />
                         <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
                     <Button
                         x:Name="button_close"
@@ -138,7 +140,8 @@
                                 Command="{Binding PrintXYCommand}"
                                 />
                     </StackPanel>
-
+                    <TextBlock Grid.Column="2" Text="{Binding TotalChunks}"/>
+                    <TextBlock Grid.Column="3" Text="{Binding QueryedChunkCount}"/>
                 </Grid>
             </Grid>
         </Border>
