@@ -9,10 +9,19 @@ using System.Text;
 
 namespace BreachQR
 {
+    public static class TransferLimits
+    {
+        public const long MaxFileSize = 8L * 1024 * 1024;
+        public const int MaxBlockSize = 1600;
+        public const int MaxBlockCount = 8192;
+        public const int MaxConcurrentSessions = 3;
+        public const int MaxPendingPacketsPerSession = 128;
+        public const int MaxGaussianUnknowns = 2048;
+        public static readonly TimeSpan SessionTimeout = TimeSpan.FromMinutes(2);
+    }
+
     public sealed class FountainPacket
     {
-        private const string ProtocolPrefix = "BQR2";
-
         public string SessionId { get; init; }
         public ulong Sequence { get; init; }
         public int BlockCount { get; init; }
@@ -22,88 +31,6 @@ namespace BreachQR
         public string FileHash { get; init; }
         public byte[] Payload { get; init; }
 
-        public string Serialize()
-        {
-            string encodedName = Base64Url.Encode(Encoding.UTF8.GetBytes(FileName));
-            string encodedPayload = Convert.ToBase64String(Payload);
-            return string.Join("|",
-                ProtocolPrefix,
-                SessionId,
-                Sequence.ToString("X"),
-                BlockCount,
-                BlockSize,
-                FileSize,
-                encodedName,
-                FileHash,
-                Crc32.Compute(Payload).ToString("X8"),
-                encodedPayload);
-        }
-
-        public static bool TryParse(string text, out FountainPacket packet)
-        {
-            packet = null;
-            string[] parts = text?.Split('|');
-            if (parts == null || parts.Length != 10 || parts[0] != ProtocolPrefix)
-            {
-                return false;
-            }
-
-            try
-            {
-                if (parts[1].Length != 32 ||
-                    !ulong.TryParse(parts[2], System.Globalization.NumberStyles.HexNumber, null, out ulong sequence) ||
-                    !int.TryParse(parts[3], out int blockCount) ||
-                    !int.TryParse(parts[4], out int blockSize) ||
-                    !long.TryParse(parts[5], out long fileSize) ||
-                    !uint.TryParse(parts[8], System.Globalization.NumberStyles.HexNumber, null, out uint expectedCrc) ||
-                    blockCount < 1 || blockCount > 1_000_000 ||
-                    blockSize < 1 || blockSize > 4096 ||
-                    fileSize < 0 || fileSize > (long)blockCount * blockSize ||
-                    blockCount != Math.Max(1, (int)((fileSize + blockSize - 1) / blockSize)))
-                {
-                    return false;
-                }
-
-                if (Convert.FromHexString(parts[1]).Length != 16)
-                {
-                    return false;
-                }
-
-                string fileName = Path.GetFileName(Encoding.UTF8.GetString(Base64Url.Decode(parts[6])));
-                byte[] payload = Convert.FromBase64String(parts[9]);
-                if (string.IsNullOrWhiteSpace(fileName) || payload.Length != blockSize || Crc32.Compute(payload) != expectedCrc)
-                {
-                    return false;
-                }
-
-                byte[] hash = Base64Url.Decode(parts[7]);
-                if (hash.Length != SHA256.HashSizeInBytes)
-                {
-                    return false;
-                }
-
-                packet = new FountainPacket
-                {
-                    SessionId = parts[1],
-                    Sequence = sequence,
-                    BlockCount = blockCount,
-                    BlockSize = blockSize,
-                    FileSize = fileSize,
-                    FileName = fileName,
-                    FileHash = parts[7],
-                    Payload = payload
-                };
-                return true;
-            }
-            catch (FormatException)
-            {
-                return false;
-            }
-            catch (ArgumentException)
-            {
-                return false;
-            }
-        }
     }
 
     public sealed class FountainEncoder
@@ -115,7 +42,7 @@ namespace BreachQR
         public FountainEncoder(byte[] data, string fileName, int blockSize = DefaultBlockSize, string sessionId = null)
         {
             ArgumentNullException.ThrowIfNull(data);
-            if (blockSize < 1 || blockSize > 4096)
+            if (blockSize < 1 || blockSize > TransferLimits.MaxBlockSize)
             {
                 throw new ArgumentOutOfRangeException(nameof(blockSize));
             }
@@ -127,8 +54,17 @@ namespace BreachQR
             }
 
             FileSize = data.LongLength;
+            if (FileSize > TransferLimits.MaxFileSize)
+            {
+                throw new ArgumentOutOfRangeException(nameof(data), $"File size exceeds {TransferLimits.MaxFileSize} bytes.");
+            }
+
             BlockSize = blockSize;
             BlockCount = Math.Max(1, (int)((FileSize + blockSize - 1) / blockSize));
+            if (BlockCount > TransferLimits.MaxBlockCount)
+            {
+                throw new ArgumentOutOfRangeException(nameof(data), "File requires too many source blocks.");
+            }
             FileHash = Base64Url.Encode(SHA256.HashData(data));
             SessionId = sessionId ?? Guid.NewGuid().ToString("N");
             if (SessionId.Length != 32 || Convert.FromHexString(SessionId).Length != 16)
@@ -158,7 +94,13 @@ namespace BreachQR
 
         public static FountainEncoder FromFile(string path, int blockSize = DefaultBlockSize)
         {
-            return new FountainEncoder(File.ReadAllBytes(path), Path.GetFileName(path), blockSize);
+            var fileInfo = new FileInfo(path);
+            if (fileInfo.Length > TransferLimits.MaxFileSize)
+            {
+                throw new ArgumentOutOfRangeException(nameof(path), $"File size exceeds {TransferLimits.MaxFileSize} bytes.");
+            }
+
+            return new FountainEncoder(File.ReadAllBytes(path), fileInfo.Name, blockSize);
         }
 
         public FountainPacket CreatePacket(ulong sequence)
@@ -220,7 +162,8 @@ namespace BreachQR
                 return false;
             }
 
-            if (!receivedSequences.Add(packet.Sequence))
+            int maxReceivedPackets = checked(BlockCount * 4 + 256);
+            if (receivedSequences.Count >= maxReceivedPackets || !receivedSequences.Add(packet.Sequence))
             {
                 return false;
             }
@@ -238,6 +181,12 @@ namespace BreachQR
 
             if (indices.Count > 0)
             {
+                int maxEquations = checked(BlockCount * 2 + 256);
+                if (equations.Count >= maxEquations)
+                {
+                    return false;
+                }
+
                 equations.Add(new Equation(indices, payload));
                 Peel();
                 TryGaussianSolve();
@@ -331,7 +280,9 @@ namespace BreachQR
         private void TryGaussianSolve()
         {
             int unsolvedCount = BlockCount - solvedBlocks.Count;
-            if (unsolvedCount == 0 || equations.Count < unsolvedCount)
+            if (unsolvedCount == 0 ||
+                unsolvedCount > TransferLimits.MaxGaussianUnknowns ||
+                equations.Count < unsolvedCount)
             {
                 return;
             }
@@ -392,6 +343,7 @@ namespace BreachQR
 
     internal static class FountainSampler
     {
+        private const int MaxCachedDistributions = 16;
         private static readonly ConcurrentDictionary<int, double[]> DegreeDistributions = new();
 
         public static int[] GetSourceIndices(int blockCount, string sessionId, ulong sequence)
@@ -420,7 +372,14 @@ namespace BreachQR
                 return 1;
             }
 
-            double[] cumulative = DegreeDistributions.GetOrAdd(blockCount, CreateRobustSolitonDistribution);
+            if (!DegreeDistributions.TryGetValue(blockCount, out double[] cumulative))
+            {
+                cumulative = CreateRobustSolitonDistribution(blockCount);
+                if (DegreeDistributions.Count < MaxCachedDistributions)
+                {
+                    DegreeDistributions.TryAdd(blockCount, cumulative);
+                }
+            }
             int index = Array.BinarySearch(cumulative, value);
             if (index < 0)
             {
@@ -506,7 +465,7 @@ namespace BreachQR
     {
         private static readonly uint[] Table = CreateTable();
 
-        public static uint Compute(byte[] data)
+        public static uint Compute(ReadOnlySpan<byte> data)
         {
             uint crc = uint.MaxValue;
             foreach (byte value in data)

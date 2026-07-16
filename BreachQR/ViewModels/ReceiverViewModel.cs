@@ -1,4 +1,3 @@
-using BreachQR.ViewModels;
 using CommunityToolkit.Mvvm.ComponentModel;
 using System;
 using System.Diagnostics;
@@ -16,13 +15,12 @@ using ZXing.Windows.Compatibility;
 namespace BreachQR.ViewModels
 {
     [SupportedOSPlatform("windows")]
-    public partial class ReceiverViewModel : ObservableObject, ITransferViewModel
+    public partial class ReceiverViewModel : TransferViewModelBase
     {
+        private const int ScanIntervalMilliseconds = 25;
+
         private readonly BarcodeReader barcodeReader = new();
-        private CancellationTokenSource cancellation;
-        private FountainDecoder decoder;
-        private string savedSessionId;
-        private bool started;
+        private readonly FountainSessionReceiver sessionReceiver = new();
 
         [ObservableProperty] private string fileName;
         [ObservableProperty] private long fileBytes;
@@ -32,27 +30,7 @@ namespace BreachQR.ViewModels
         [ObservableProperty] private string statusMessage = "将接收框覆盖到发送端二维码上";
         [ObservableProperty] private string outputPath;
 
-        public void Start()
-        {
-            if (started)
-            {
-                return;
-            }
-
-            started = true;
-            cancellation = new CancellationTokenSource();
-            _ = ReceiveTask(cancellation.Token);
-        }
-
-        public void Stop()
-        {
-            cancellation?.Cancel();
-            cancellation?.Dispose();
-            cancellation = null;
-            started = false;
-        }
-
-        private async Task ReceiveTask(CancellationToken token)
+        protected override async Task RunAsync(CancellationToken token)
         {
             try
             {
@@ -62,19 +40,14 @@ namespace BreachQR.ViewModels
                     IntPtr handle = new WindowInteropHelper(Application.Current.MainWindow).Handle;
                     if (handle != IntPtr.Zero && GetWindowRect(handle, out RECT rect))
                     {
-                        Result result = await Task.Run(() =>
+                        ReceiverDisplayUpdate update = await Task.Run(() => CaptureDecodeProcessAndSave(rect), token);
+                        if (update != null)
                         {
-                            using Bitmap snapshot = CaptureScreenSnapshot(rect.Left, rect.Top, rect.Right, rect.Bottom);
-                            return barcodeReader.Decode(snapshot);
-                        }, token);
-
-                        if (result != null && FountainPacket.TryParse(result.Text, out FountainPacket packet))
-                        {
-                            ProcessPacket(packet);
+                            ApplyUpdate(update);
                         }
                     }
 
-                    await Task.Delay(10, token);
+                    await Task.Delay(ScanIntervalMilliseconds, token);
                 }
             }
             catch (OperationCanceledException)
@@ -87,52 +60,52 @@ namespace BreachQR.ViewModels
             }
         }
 
-        private void ProcessPacket(FountainPacket packet)
+        private ReceiverDisplayUpdate CaptureDecodeProcessAndSave(RECT rect)
         {
-            if (savedSessionId == packet.SessionId)
+            using Bitmap snapshot = CaptureScreenSnapshot(rect.Left, rect.Top, rect.Right, rect.Bottom);
+            Result result = barcodeReader.Decode(snapshot);
+            if (!QrBinaryPayload.TryExtract(result, out byte[] frame))
             {
-                return;
+                return null;
             }
 
-            if (decoder == null || decoder.SessionId != packet.SessionId)
+            FountainReceiveUpdate update = sessionReceiver.AddFrame(frame, DateTime.UtcNow);
+            if (update == null)
             {
-                decoder = new FountainDecoder();
-                savedSessionId = null;
-                FileName = packet.FileName;
-                FileBytes = packet.FileSize;
-                TotalChunks = packet.BlockCount;
-                QueryedChunkCount = 0;
-                ReceivedPacketCount = 0;
-                OutputPath = null;
+                return null;
             }
 
-            if (!decoder.AddPacket(packet))
+            string outputPath = null;
+            if (update.CompletedData != null)
             {
-                return;
+                string receiveDirectory = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                    "BreachQR Received");
+                Directory.CreateDirectory(receiveDirectory);
+                outputPath = CreateUniquePath(receiveDirectory, update.Manifest.FileName);
+                File.WriteAllBytes(outputPath, update.CompletedData);
             }
 
-            ReceivedPacketCount = decoder.ReceivedPacketCount;
-            QueryedChunkCount = decoder.SolvedBlockCount;
-            StatusMessage = $"已恢复 {QueryedChunkCount}/{TotalChunks} 个源分片";
-            if (decoder.IsComplete && savedSessionId != decoder.SessionId)
-            {
-                SaveDecodedFile();
-            }
+            return new ReceiverDisplayUpdate(update, outputPath);
         }
 
-        private void SaveDecodedFile()
+        private void ApplyUpdate(ReceiverDisplayUpdate displayUpdate)
         {
-            byte[] data = decoder.GetDecodedData();
-            string receiveDirectory = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-                "BreachQR Received");
-            Directory.CreateDirectory(receiveDirectory);
+            FountainReceiveUpdate update = displayUpdate.Update;
+            FileName = update.Manifest.FileName;
+            FileBytes = update.Manifest.FileSize;
+            TotalChunks = update.Manifest.BlockCount;
+            QueryedChunkCount = update.RecoveredBlocks;
+            ReceivedPacketCount = update.ReceivedPackets;
 
-            string path = CreateUniquePath(receiveDirectory, decoder.FileName);
-            File.WriteAllBytes(path, data);
-            savedSessionId = decoder.SessionId;
-            OutputPath = path;
-            StatusMessage = $"接收完成: {path}";
+            if (displayUpdate.OutputPath == null)
+            {
+                StatusMessage = $"已恢复 {update.RecoveredBlocks}/{update.Manifest.BlockCount} 个源分片";
+                return;
+            }
+
+            OutputPath = displayUpdate.OutputPath;
+            StatusMessage = $"接收完成: {displayUpdate.OutputPath}";
         }
 
         private static string CreateUniquePath(string directory, string fileName)
@@ -174,5 +147,7 @@ namespace BreachQR.ViewModels
             graphics.CopyFromScreen(x1, y1, 0, 0, snapshot.Size, CopyPixelOperation.SourceCopy);
             return snapshot;
         }
+
+        private sealed record ReceiverDisplayUpdate(FountainReceiveUpdate Update, string OutputPath);
     }
 }

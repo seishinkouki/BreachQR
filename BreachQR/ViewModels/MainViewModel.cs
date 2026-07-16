@@ -17,9 +17,4 @@ namespace BreachQR.ViewModels
         public ITransferViewModel CurrentViewModel { get; }
     }
 
-    public interface ITransferViewModel
-    {
-        void Start();
-        void Stop();
-    }
 }

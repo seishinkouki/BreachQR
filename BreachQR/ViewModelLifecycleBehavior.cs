@@ -1,5 +1,9 @@
-using System.Windows;
 using BreachQR.ViewModels;
+using System;
+using System.Diagnostics;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Windows;
 
 namespace BreachQR
 {
@@ -40,13 +44,15 @@ namespace BreachQR
                 element.SetValue(StateProperty, state);
             }
 
-            state.SetViewModel((ITransferViewModel)args.NewValue);
+            state.ChangeViewModel((ITransferViewModel)args.NewValue);
         }
 
         private sealed class LifecycleState
         {
             private readonly FrameworkElement element;
+            private readonly SemaphoreSlim transitionGate = new(1, 1);
             private ITransferViewModel viewModel;
+            private bool isLoaded;
             private bool isStarted;
 
             public LifecycleState(FrameworkElement element)
@@ -61,51 +67,94 @@ namespace BreachQR
                 }
             }
 
-            public void SetViewModel(ITransferViewModel value)
+            public void ChangeViewModel(ITransferViewModel value)
             {
-                Stop();
-                viewModel = value;
-                if (element.IsLoaded)
-                {
-                    Start();
-                }
+                RunTransition(() => ChangeViewModelAsync(value));
             }
 
             private void OnLoaded(object sender, RoutedEventArgs args)
             {
-                Start();
+                RunTransition(() => SetLoadedAsync(true));
             }
 
             private void OnUnloaded(object sender, RoutedEventArgs args)
             {
-                Stop();
+                RunTransition(() => SetLoadedAsync(false));
             }
 
-            private void OnClosed(object sender, System.EventArgs args)
+            private void OnClosed(object sender, EventArgs args)
             {
-                Stop();
+                RunTransition(() => SetLoadedAsync(false));
             }
 
-            private void Start()
+            private async Task ChangeViewModelAsync(ITransferViewModel value)
             {
-                if (isStarted || viewModel == null)
+                await transitionGate.WaitAsync();
+                try
+                {
+                    await StopCurrentAsync();
+                    viewModel = value;
+                    await StartCurrentAsync();
+                }
+                finally
+                {
+                    transitionGate.Release();
+                }
+            }
+
+            private async Task SetLoadedAsync(bool value)
+            {
+                await transitionGate.WaitAsync();
+                try
+                {
+                    isLoaded = value;
+                    if (isLoaded)
+                    {
+                        await StartCurrentAsync();
+                    }
+                    else
+                    {
+                        await StopCurrentAsync();
+                    }
+                }
+                finally
+                {
+                    transitionGate.Release();
+                }
+            }
+
+            private async Task StartCurrentAsync()
+            {
+                if (!isLoaded || isStarted || viewModel == null)
                 {
                     return;
                 }
 
-                viewModel.Start();
+                await viewModel.StartAsync();
                 isStarted = true;
             }
 
-            private void Stop()
+            private async Task StopCurrentAsync()
             {
-                if (!isStarted)
+                if (!isStarted || viewModel == null)
                 {
                     return;
                 }
 
-                viewModel.Stop();
+                await viewModel.StopAsync();
                 isStarted = false;
+            }
+
+            private static async void RunTransition(Func<Task> transition)
+            {
+                try
+                {
+                    await transition();
+                }
+                catch (Exception ex)
+                {
+                    Trace.WriteLine(ex);
+                }
             }
         }
     }
