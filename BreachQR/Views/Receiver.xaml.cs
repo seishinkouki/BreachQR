@@ -13,20 +13,20 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 
-namespace BreachQR
+namespace BreachQR.Views
 {
     /// <summary>
-    /// Sender.xaml 的交互逻辑
+    /// Receiver.xaml 的交互逻辑
     /// </summary>
-    public partial class Sender : Page
+    public partial class Receiver : UserControl
     {
-        public Sender()
+        public Receiver()
         {
             InitializeComponent();
         }
         private void button_close_Click(object sender, RoutedEventArgs e)
         {
-            Environment.Exit(0);
+            Application.Current.Shutdown();
         }
     }
 }
